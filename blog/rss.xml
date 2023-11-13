@@ -4,9 +4,48 @@
         <title>AutoGen Blog</title>
         <link>https://microsoft.github.io/autogen/blog</link>
         <description>AutoGen Blog</description>
-        <lastBuildDate>Mon, 06 Nov 2023 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Thu, 09 Nov 2023 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
+        <item>
+            <title><![CDATA[EcoAssistant - Using LLM Assistants More Accurately and Affordably]]></title>
+            <link>https://microsoft.github.io/autogen/blog/2023/11/09/EcoAssistant</link>
+            <guid>EcoAssistant - Using LLM Assistants More Accurately and Affordably</guid>
+            <pubDate>Thu, 09 Nov 2023 00:00:00 GMT</pubDate>
+            <description><![CDATA[system]]></description>
+            <content:encoded><![CDATA[<p><img src="img/system.png" alt="system"/></p><p><strong>TL;DR:</strong></p><ul><li>Introducing the <strong>EcoAssistant</strong>, which is designed to solve user queries more accurately and affordably.</li><li>We show how to let the LLM assistant agent leverage external API to solve user query.</li><li>We show how to reduce the cost of using GPT models via <strong>Assistant Hierachy</strong>.</li><li>We show how to leverage the idea of Retrieval-augmented Generation (RAG) to improve the success rate via <strong>Solution Demonstration</strong>.</li></ul><h2>EcoAssistant</h2><p>In this blog, we introduce the <strong>EcoAssistant</strong>, a system built upon AutoGen with the goal of solving user queries more accurately and affordably.</p><h3>Problem setup</h3><p>Recently, users have been using conversational LLMs such as ChatGPT for various queries.
+Reports indicate that 23% of ChatGPT user queries are for knowledge extraction purposes.
+Many of these queries require knowledge that is external to the information stored within any pre-trained large language models (LLMs).
+These tasks can only be completed by generating code to fetch necessary information via external APIs that contain the requested information.
+In the table below, we show three types of user queries that we aim to address in this work.</p><table><thead><tr><th>Dataset</th><th>API</th><th>Example query</th></tr></thead><tbody><tr><td>Places</td><td><a href="https://developers.google.com/maps/documentation/places/web-service/overview">Google Places</a></td><td>I’m looking for a 24-hour pharmacy in Montreal, can you find one for me?</td></tr><tr><td>Weather</td><td><a href="https://www.weatherapi.com">Weather API</a></td><td>What is the current cloud coverage in Mumbai, India?</td></tr><tr><td>Stock</td><td><a href="https://www.alphavantage.co/documentation/">Alpha Vantage Stock API</a></td><td>Can you give me the opening price of Microsoft for the month of January 2023?</td></tr></tbody></table><h3>Leveraging external APIs</h3><p>To address these queries, we first build a <strong>two-agent system</strong> based on AutoGen,
+where the first agent is a <strong>LLM assistant agent</strong> (<code>AssistantAgent</code> in AutoGen) that is responsible for proposing and refining the code and
+the second agent is a <strong>code executor agent</strong> (<code>UserProxyAgent</code> in AutoGen) that would extract the generated code and execute it, forwarding the output back to the LLM assistant agent.
+A visualization of the two-agent system is shown below.</p><p><img src="img/chat.png" alt="chat"/></p><p>To instruct the assistant agent to leverage external APIs, we only need to add the API name/key dictionary at the beginning of the initial message.
+The template is shown below, where the red part is the information of APIs and black part is user query.</p><p><img src="img/template.png" alt="template"/></p><p>Importantly, we don&#x27;t want to reveal our real API key to the assistant agent for safety concerns.
+Therefore, we use a <strong>fake API key</strong> to replace the real API key in the initial message.
+In particular, we generate a random token (e.g., <code>181dbb37</code>) for each API key and replace the real API key with the token in the initial message.
+Then, when the code executor execute the code, the fake API key would be automatically replaced by the real API key.</p><h3>Solution Demonstration</h3><p>In most practical scenarios, queries from users would appear sequentially over time.
+Our <strong>EcoAssistant</strong> leverages past success to help the LLM assistants address future queries via <strong>Solution Demonstration</strong>.
+Specifically, whenever a query is deemed successfully resolved by user feedback, we capture and store the query and the final generated code snippet.
+These query-code pairs are saved in a specialized vector database. When new queries appear, <strong>EcoAssistant</strong> retrieves the most similar query from the database, which is then appended with the associated code to the initial prompt for the new query, serving as a demonstration.
+The new template of initial message is shown below, where the blue part corresponds to the solution demonstration.</p><p><img src="img/template-demo.png" alt="template"/></p><p>We found that this utilization of past successful query-code pairs improves the query resolution process with fewer iterations and enhances the system&#x27;s performance.</p><h3>Assistant Hierarchy</h3><p>LLMs usually have different prices and performance, for example, GPT-3.5-turbo is much cheaper than GPT-4 but also less accurate.
+Thus, we propose the <strong>Assistant Hierarchy</strong> to reduce the cost of using LLMs.
+The core idea is that we use the cheaper LLMs first and only use the more expensive LLMs when necessary.
+By this way, we are able to reduce the reliance on expensive LLMs and thus reduce the cost.
+In particular, given multiple LLMs, we initiate one assistant agent for each and start the conversation with the most cost-effective LLM assistant.
+If the conversation between the current LLM assistant and the code executor concludes without successfully resolving the query, <strong>EcoAssistant</strong> would then restart the conversation with the next more expensive LLM assistant in the hierarchy.
+We found that this strategy significantly reduces costs while still effectively addressing queries.</p><h3>A Synergistic Effect</h3><p>We found that the <strong>Assistant Hierarchy</strong> and <strong>Solution Demonstration</strong> of <strong>EcoAssistant</strong> have a synergistic effect.
+Because the query-code database is shared by all LLM assistants, even without specialized design,
+the solution from more powerful LLM assistant (e.g., GPT-4) could be later retrieved to guide weaker LLM assistant (e.g., GPT-3.5-turbo).
+Such a synergistic effect further improves the performance and reduces the cost of <strong>EcoAssistant</strong>.</p><h3>Experimental Results</h3><p>We evaluate <strong>EcoAssistant</strong> on three datasets: Places, Weather, and Stock. When comparing it with a single GPT-4 assistant, we found that <strong>EcoAssistant</strong> achieves a higher success rate with a lower cost as shown in the figure below.
+For more details about the experimental results and other experiments, please refer to our <a href="https://arxiv.org/abs/2310.03046">paper</a>.</p><p><img src="img/results.png" alt="exp"/></p><h2>Further reading</h2><p>Please refer to our <a href="https://arxiv.org/abs/2310.03046">paper</a> and <a href="https://github.com/JieyuZ2/EcoAssistant">codebase</a> for more details about <strong>EcoAssistant</strong>.</p><p>If you find this blog useful, please consider citing:</p><pre><code class="language-bibtex">@article{zhang2023ecoassistant,
+  title={EcoAssistant: Using LLM Assistant More Affordably and Accurately},
+  author={Zhang, Jieyu and Krishna, Ranjay and Awadallah, Ahmed H and Wang, Chi},
+  journal={arXiv preprint arXiv:2310.03046},
+  year={2023}
+}
+</code></pre>]]></content:encoded>
+        </item>
         <item>
             <title><![CDATA[Multimodal with GPT-4V and LLaVA]]></title>
             <link>https://microsoft.github.io/autogen/blog/2023/11/06/LMM-Agent</link>
